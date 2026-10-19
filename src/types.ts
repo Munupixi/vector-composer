@@ -1,5 +1,11 @@
 export interface SourceObject { id: string; name: string; }
 
+export interface SourceIllustration {
+  id: string;
+  title: string;
+  objects: SourceObject[];
+}
+
 export interface LibraryComponent {
   id: string;
   sourceId: string;

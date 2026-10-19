@@ -1,12 +1,8 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { extractObject, namespaceIds } from './svg';
 import type { LibraryComponent, SceneObject, SourceObject } from './types';
-
-const objects: SourceObject[] = [
-  { id: 'character', name: 'Персонаж' },
-  { id: 'papers-left', name: 'Листы слева' },
-  { id: 'papers-right', name: 'Листы справа' },
-];
+import { catalog, sourceUrl } from './catalog';
+import SourceCatalogue from './components/SourceCatalogue';
 
 function ComponentPreview({ component }: { component: LibraryComponent }) {
   return <svg viewBox={`0 0 ${component.width} ${component.height}`} aria-hidden="true"
@@ -14,6 +10,10 @@ function ComponentPreview({ component }: { component: LibraryComponent }) {
 }
 
 export default function App() {
+  const [sourceId, setSourceId] = useState('clumsy');
+  const [catalogOpen, setCatalogOpen] = useState(false);
+  const activeSource = catalog.find(s => s.id === sourceId)!;
+  const objects: SourceObject[] = activeSource.objects;
   const [source, setSource] = useState('');
   const [chosen, setChosen] = useState<string | null>(null);
   const [library, setLibrary] = useState<LibraryComponent[]>([]);
@@ -26,11 +26,16 @@ export default function App() {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch('/assets/prepared/clumsy.svg', { signal: controller.signal })
+    fetch(sourceUrl(activeSource), { signal: controller.signal })
       .then(r => { if (!r.ok) throw new Error('Исходник не загрузился. Обновите страницу.'); return r.text(); })
       .then(setSource).catch(e => { if (e.name !== 'AbortError') setError(e.message); });
     return () => controller.abort();
-  }, []);
+  }, [activeSource]);
+
+  function chooseSource(id: string) {
+    if (id !== sourceId) { setSource(''); setChosen(null); setError(''); setSourceId(id); }
+    setCatalogOpen(false);
+  }
 
   const selectedObject = objects.find(o => o.id === chosen);
   const selectedInstance = scene.find(o => o.id === selection);
@@ -38,14 +43,14 @@ export default function App() {
 
   function saveComponent() {
     if (!chosen || !selectedObject) return;
-    if (library.some(c => c.objectId === chosen)) {
+    if (library.some(c => c.sourceId === sourceId && c.objectId === chosen)) {
       setNotice('Этот объект уже есть в библиотеке. Нажмите на его карточку, чтобы добавить на холст.'); return;
     }
     try {
       const extracted = extractObject(source, chosen);
       const id = crypto.randomUUID();
       setLibrary(items => [...items, { ...extracted, id,
-        sourceId: 'clumsy', objectId: chosen, name: selectedObject.name }]);
+        sourceId, objectId: chosen, name: selectedObject.name }]);
       setNotice(`Компонент «${selectedObject.name}» сохранён. Теперь нажмите на его карточку.`); setError('');
     } catch (e) { setError(e instanceof Error ? e.message : 'Не удалось извлечь объект.'); }
   }
@@ -86,19 +91,21 @@ export default function App() {
     <div className="workspace">
       <aside className="sidebar">
         <section className="source-section">
-          <div className="section-heading"><h2>Исходная иллюстрация</h2><span className="count">01</span></div>
-          <p className="helper">Выберите объект в иллюстрации или в списке ниже.</p>
+          <div className="section-heading"><h2>Исходная иллюстрация</h2><button className="text-button" onClick={() => setCatalogOpen(true)}>Все 20 ↗</button></div>
+          <p className="helper">{objects.length ? 'Выберите объект в иллюстрации или в списке ниже.' : 'Этот исходник доступен для просмотра. Выберите подготовленный, чтобы извлечь объект.'}</p>
+          {chosen && <style>{`.source-preview [data-component]:not([data-component="${chosen}"]) { opacity: .16; }`}</style>}
           <div className="source-preview" data-selected={chosen ?? ''} onClick={event => {
             const key = (event.target as Element).closest('[data-component]')?.getAttribute('data-component');
             if (key) { setChosen(key); setNotice(''); }
           }} dangerouslySetInnerHTML={{ __html: source }} />
-          <div className="source-caption"><strong>Всё идёт не по плану</strong><span>Open Doodles · SVG</span></div>
+          <div className="source-caption"><strong>{activeSource.title}</strong><span>Open Doodles · SVG {objects.length > 0 && '· Готов к извлечению'}</span></div>
           <div className="object-list" aria-label="Объекты исходника">{objects.map((object, index) =>
             <button key={object.id} className={`object-option ${chosen === object.id ? 'active' : ''}`} aria-pressed={chosen === object.id}
               onClick={() => { setChosen(object.id); setNotice(''); }}>
               <span className="object-number">0{index + 1}</span><span>{object.name}</span><span className="choice-mark">{chosen === object.id ? '✓' : '+'}</span>
             </button>)}</div>
-          <button className="primary-button" disabled={!chosen || !source} onClick={saveComponent}>Сохранить в библиотеку <span>↗</span></button>
+          {objects.length ? <button className="primary-button" disabled={!chosen || !source} onClick={saveComponent}>Сохранить в библиотеку <span>↗</span></button>
+            : <button className="primary-button" onClick={() => setCatalogOpen(true)}>Выбрать другой исходник <span>↗</span></button>}
         </section>
         <section className="library-section">
           <div className="section-heading"><h2>Мои компоненты</h2><span className="count">{String(library.length).padStart(2, '0')}</span></div>
@@ -133,5 +140,6 @@ export default function App() {
         <div className="feedback" role={error ? 'alert' : 'status'}>{error || notice || 'Начните с выбора объекта в исходной иллюстрации.'}</div>
       </main>
     </div>
+    {catalogOpen && <SourceCatalogue activeId={sourceId} onChoose={chooseSource} onClose={() => setCatalogOpen(false)} />}
   </div>;
 }

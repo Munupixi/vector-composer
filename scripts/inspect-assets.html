@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ru"><meta charset="UTF-8"><title>SVG asset inspection</title>
+<style>body{font:14px system-ui;background:#faf9f4;margin:24px}#source svg{width:600px;max-width:100%}#parts{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}.part{border:1px solid #ccc;padding:10px}.part svg{height:130px;width:100%;display:block}pre{font-size:11px;white-space:pre-wrap}</style>
+<h1>Source geometry inspection</h1><div id="source"></div><div id="parts"></div>
+<script type="module">
+const name = new URLSearchParams(location.search).get('name') || 'levitate';
+if (!/^[a-z-]+$/.test(name)) throw Error('Invalid asset name');
+const text = await (await fetch(`/assets/originals/${name}.svg`)).text();
+const source = document.querySelector('#source'); source.innerHTML = text;
+for (const [index, path] of [...source.querySelectorAll('path')].entries()) {
+  const box = path.getBBox();
+  const card = document.createElement('div'); card.className = 'part';
+  const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('viewBox',`${box.x-4} ${box.y-4} ${box.width+8} ${box.height+8}`);
+  const clone=path.cloneNode(true); clone.setAttribute('fill',getComputedStyle(path).fill); svg.append(clone);
+  const label=document.createElement('pre'); label.textContent = `${index}: ${path.parentElement.id}\n${[box.x,box.y,box.width,box.height].map(Math.round).join(', ')}`;
+  card.append(svg,label); document.querySelector('#parts').append(card);
+}
+</script></html>
