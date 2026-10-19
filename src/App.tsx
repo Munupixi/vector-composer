@@ -1,12 +1,16 @@
-import { useEffect, useRef, useState, type PointerEvent } from 'react';
-import { extractObject, namespaceIds } from './svg';
+import { useEffect, useRef, useState, type PointerEvent, type KeyboardEvent } from 'react';
+import { extractObject } from './svg';
 import type { LibraryComponent, SceneObject, SourceObject } from './types';
 import { catalog, sourceUrl } from './catalog';
 import SourceCatalogue from './components/SourceCatalogue';
+import SvgFragment from './components/SvgFragment';
+import ObjectProperties from './components/ObjectProperties';
+import SceneLayers from './components/SceneLayers';
+import { duplicateObject, moveLayer, objectTransform, resizeObject } from './scene';
 
 function ComponentPreview({ component }: { component: LibraryComponent }) {
-  return <svg viewBox={`0 0 ${component.width} ${component.height}`} aria-hidden="true"
-    dangerouslySetInnerHTML={{ __html: namespaceIds(component.markup, `thumb-${component.id}`) }} />;
+  return <svg viewBox={`0 0 ${component.width} ${component.height}`} aria-hidden="true">
+    <SvgFragment markup={component.markup} prefix={`thumb-${component.id}`} /></svg>;
 }
 
 export default function App() {
@@ -40,6 +44,30 @@ export default function App() {
   const selectedObject = objects.find(o => o.id === chosen);
   const selectedInstance = scene.find(o => o.id === selection);
   const selectedComponent = library.find(c => c.id === selectedInstance?.componentId);
+
+  function changeSelected(patch: Partial<Pick<SceneObject, 'x' | 'y' | 'rotation'>>) {
+    setScene(items => items.map(item => item.id === selection ? { ...item, ...patch } : item));
+  }
+  function duplicateSelected() {
+    if (!selectedInstance) return;
+    const copy = duplicateObject(selectedInstance, crypto.randomUUID());
+    setScene(items => [...items, copy]); setSelection(copy.id);
+    setNotice('Создана независимая копия объекта.');
+  }
+  function deleteSelected() {
+    setScene(items => items.filter(item => item.id !== selection)); setSelection(null);
+    setNotice('Объект удалён с холста. Компонент остался в библиотеке.');
+  }
+  function handleKeys(event: KeyboardEvent<HTMLDivElement>) {
+    const target = event.target as HTMLElement;
+    if (catalogOpen || target.closest('input, textarea, select, [contenteditable="true"]') || !selectedInstance) return;
+    if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); deleteSelected(); }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd') { event.preventDefault(); duplicateSelected(); }
+    const step = event.shiftKey ? 10 : 1;
+    const directions: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+    const delta = directions[event.key];
+    if (delta) { event.preventDefault(); changeSelected({ x: selectedInstance.x + delta[0], y: selectedInstance.y + delta[1] }); }
+  }
 
   function saveComponent() {
     if (!chosen || !selectedObject) return;
@@ -82,7 +110,7 @@ export default function App() {
     } : item));
   }
 
-  return <div className="app-shell">
+  return <div className="app-shell" onKeyDown={handleKeys}>
     <header className="topbar">
       <a className="brand" href="/" aria-label="Сочетай — на главную"><span className="brand-mark" aria-hidden="true"><i /><i /><i /></span>сочетай<span className="brand-dot">.</span></a>
       <span className="topbar-caption">Конструктор векторных композиций</span>
@@ -112,23 +140,23 @@ export default function App() {
           {library.length === 0 ? <div className="library-empty"><span aria-hidden="true">▧</span><p>Здесь появятся ваши объекты</p><small>Выберите объект и сохраните его в библиотеку.</small></div>
             : <div className="component-grid">{library.map(component => <button key={component.id} className="component-card" onClick={() => addToCanvas(component)} aria-label={`Добавить на холст: ${component.name}`}>
               <div className="component-picture"><ComponentPreview component={component} /><span className="card-plus">+</span></div>
-              <strong>{component.name}</strong><small>Нажмите, чтобы добавить</small>
+              <strong>{component.name}</strong><small>{catalog.find(s => s.id === component.sourceId)?.title}</small>
             </button>)}</div>}
         </section>
         <div className="sidebar-footer">Иллюстрации: Pablo Stanley · CC0<br />Только элементы исходного SVG</div>
       </aside>
       <main className="editor">
         <div className="editor-heading"><div><span className="eyebrow">ВАША КОМПОЗИЦИЯ</span><h1>Новая история</h1></div><span className="format-label">SVG <span>1200 × 800</span></span></div>
-        <div className="canvas-toolbar"><span><span className="status-dot" /> Холст</span><span>Объектов: {scene.length}</span></div>
+        <div className="canvas-toolbar"><span><span className="status-dot" /> Холст</span><span>Объектов: {scene.length} · Источников: {new Set(scene.map(item => library.find(c => c.id === item.componentId)?.sourceId)).size}</span></div>
         <div className="canvas-surround"><div className="canvas-paper">
-          <svg ref={canvasRef} className="composition" viewBox="0 0 1200 800" aria-label="Холст композиции"
+          <svg ref={canvasRef} className="composition" viewBox="0 0 1200 800" aria-label="Холст композиции" tabIndex={0}
             onPointerDown={() => setSelection(null)} onPointerMove={moveDrag} onPointerUp={() => { drag.current = null; }}
             onPointerCancel={() => { drag.current = null; }} onLostPointerCapture={() => { drag.current = null; }}>
             {scene.map(item => { const component = library.find(c => c.id === item.componentId)!;
-              return <g key={item.id} transform={`translate(${item.x} ${item.y}) rotate(${item.rotation}) scale(${item.scale})`}
+              return <g key={item.id} transform={objectTransform(item, component)}
                 className="scene-object" data-instance={item.id} onPointerDown={event => startDrag(event, item)}>
                 <rect width={component.width} height={component.height} fill="transparent" />
-                <g dangerouslySetInnerHTML={{ __html: namespaceIds(component.markup, `instance-${item.id}`) }} />
+                <SvgFragment markup={component.markup} prefix={`instance-${item.id}`} />
                 {selection === item.id && <rect className="selection-outline" x="-6" y="-6" width={component.width + 12} height={component.height + 12}
                   fill="none" stroke="#416b57" strokeWidth={1.5 / item.scale} strokeDasharray={`${6 / item.scale} ${4 / item.scale}`} pointerEvents="none" />}
               </g>;
@@ -139,6 +167,13 @@ export default function App() {
         <div className="canvas-footer"><span>{selectedComponent ? `Выбрано: ${selectedComponent.name}` : 'Выбирайте и перемещайте объекты мышью'}</span><span>Векторный холст</span></div>
         <div className="feedback" role={error ? 'alert' : 'status'}>{error || notice || 'Начните с выбора объекта в исходной иллюстрации.'}</div>
       </main>
+      <aside className="properties-panel">
+        <ObjectProperties item={selectedInstance} component={selectedComponent} onChange={changeSelected}
+          onScale={scale => { if (selectedComponent) setScene(items => items.map(item => item.id === selection ? resizeObject(item, selectedComponent, scale) : item)); }}
+          onDuplicate={duplicateSelected} onDelete={deleteSelected} />
+        <SceneLayers scene={scene} library={library} selection={selection} onSelect={setSelection}
+          onMove={direction => { if (selection) setScene(items => moveLayer(items, selection, direction)); }} />
+      </aside>
     </div>
     {catalogOpen && <SourceCatalogue activeId={sourceId} onChoose={chooseSource} onClose={() => setCatalogOpen(false)} />}
   </div>;
