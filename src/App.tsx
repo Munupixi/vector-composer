@@ -7,6 +7,11 @@ import SvgFragment from './components/SvgFragment';
 import ObjectProperties from './components/ObjectProperties';
 import SceneLayers from './components/SceneLayers';
 import { duplicateObject, moveLayer, objectTransform, resizeObject } from './scene';
+import { useProject } from './useProject';
+import { downloadSvg, exportComposition } from './export';
+import { exampleReferences, exampleScene, type Example } from './examples';
+import { hydrateComponents } from './storage';
+import ExamplesDialog from './components/ExamplesDialog';
 
 function ComponentPreview({ component }: { component: LibraryComponent }) {
   return <svg viewBox={`0 0 ${component.width} ${component.height}`} aria-hidden="true">
@@ -14,14 +19,15 @@ function ComponentPreview({ component }: { component: LibraryComponent }) {
 }
 
 export default function App() {
-  const [sourceId, setSourceId] = useState('clumsy');
+  const { title, setTitle, sourceId, setSourceId, library, setLibrary, scene, setScene,
+    ready, storageProblem, retryStorage, saving } = useProject();
   const [catalogOpen, setCatalogOpen] = useState(false);
+  const [examplesOpen, setExamplesOpen] = useState(false);
+  const [exampleLoading, setExampleLoading] = useState(false);
   const activeSource = catalog.find(s => s.id === sourceId)!;
   const objects: SourceObject[] = activeSource.objects;
   const [source, setSource] = useState('');
   const [chosen, setChosen] = useState<string | null>(null);
-  const [library, setLibrary] = useState<LibraryComponent[]>([]);
-  const [scene, setScene] = useState<SceneObject[]>([]);
   const [selection, setSelection] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -45,6 +51,28 @@ export default function App() {
   const selectedInstance = scene.find(o => o.id === selection);
   const selectedComponent = library.find(c => c.id === selectedInstance?.componentId);
 
+  function exportScene() {
+    try { downloadSvg(exportComposition(title, scene, library), title); setNotice('SVG скачан: объекты остались векторными и сгруппированными.'); setError(''); }
+    catch (error) { setError(error instanceof Error ? error.message : 'Не удалось экспортировать SVG.'); }
+  }
+
+  function newScene() {
+    if (scene.length && !window.confirm('Очистить холст? Компоненты останутся в библиотеке.')) return;
+    setScene([]); setSelection(null); setTitle('Новая история'); setNotice('Новый холст готов. Компоненты сохранены в библиотеке.');
+  }
+
+  async function loadExample(example: Example) {
+    if (scene.length && !window.confirm('Заменить текущую композицию примером? Компоненты останутся в библиотеке.')) return;
+    setExamplesOpen(false); setExampleLoading(true);
+    try {
+      const components = [...library, ...await hydrateComponents(exampleReferences(example, library))];
+      const items = exampleScene(example, components);
+      setLibrary(components); setScene(items); setTitle(example.title); setSelection(null); setError('');
+      setNotice('Открыт пример из трёх исходных SVG. Все объекты можно изменять по отдельности.');
+    } catch (error) { setError(error instanceof Error ? error.message : 'Не удалось открыть пример.'); }
+    finally { setExampleLoading(false); }
+  }
+
   function changeSelected(patch: Partial<Pick<SceneObject, 'x' | 'y' | 'rotation'>>) {
     setScene(items => items.map(item => item.id === selection ? { ...item, ...patch } : item));
   }
@@ -60,7 +88,7 @@ export default function App() {
   }
   function handleKeys(event: KeyboardEvent<HTMLDivElement>) {
     const target = event.target as HTMLElement;
-    if (catalogOpen || target.closest('input, textarea, select, [contenteditable="true"]') || !selectedInstance) return;
+    if (catalogOpen || examplesOpen || target.closest('input, textarea, select, [contenteditable="true"]') || !selectedInstance) return;
     if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); deleteSelected(); }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd') { event.preventDefault(); duplicateSelected(); }
     const step = event.shiftKey ? 10 : 1;
@@ -114,7 +142,8 @@ export default function App() {
     <header className="topbar">
       <a className="brand" href="/" aria-label="Сочетай — на главную"><span className="brand-mark" aria-hidden="true"><i /><i /><i /></span>сочетай<span className="brand-dot">.</span></a>
       <span className="topbar-caption">Конструктор векторных композиций</span>
-      <span className="local-badge"><span /> Локальный проект</span>
+      <span className="local-badge"><span /> {storageProblem ? 'Автосохранение недоступно' : saving ? 'Сохраняем…' : 'Сохранено в браузере'}</span>
+      <button className="export-button" disabled={!ready || !scene.length} onClick={exportScene}>Скачать SVG <span>↓</span></button>
     </header>
     <div className="workspace">
       <aside className="sidebar">
@@ -146,7 +175,7 @@ export default function App() {
         <div className="sidebar-footer">Иллюстрации: Pablo Stanley · CC0<br />Только элементы исходного SVG</div>
       </aside>
       <main className="editor">
-        <div className="editor-heading"><div><span className="eyebrow">ВАША КОМПОЗИЦИЯ</span><h1>Новая история</h1></div><span className="format-label">SVG <span>1200 × 800</span></span></div>
+        <div className="editor-heading"><div><span className="eyebrow">ВАША КОМПОЗИЦИЯ</span><input className="scene-title" aria-label="Название композиции" maxLength={120} value={title} onChange={e => setTitle(e.target.value)} placeholder="Новая история" /></div><span className="format-label">SVG <span>1200 × 800</span></span></div>
         <div className="canvas-toolbar"><span><span className="status-dot" /> Холст</span><span>Объектов: {scene.length} · Источников: {new Set(scene.map(item => library.find(c => c.id === item.componentId)?.sourceId)).size}</span></div>
         <div className="canvas-surround"><div className="canvas-paper">
           <svg ref={canvasRef} className="composition" viewBox="0 0 1200 800" aria-label="Холст композиции" tabIndex={0}
@@ -165,7 +194,11 @@ export default function App() {
           {scene.length === 0 && <div className="canvas-empty"><span className="empty-art" aria-hidden="true">✳</span><h2>У каждой истории<br />есть первый элемент</h2><p>Сохраните объект из иллюстрации слева,<br />затем добавьте его из библиотеки на холст.</p><span className="empty-step">01 — Выберите · 02 — Сохраните · 03 — Сочетайте</span></div>}
         </div></div>
         <div className="canvas-footer"><span>{selectedComponent ? `Выбрано: ${selectedComponent.name}` : 'Выбирайте и перемещайте объекты мышью'}</span><span>Векторный холст</span></div>
-        <div className="feedback" role={error ? 'alert' : 'status'}>{error || notice || 'Начните с выбора объекта в исходной иллюстрации.'}</div>
+        <div className="feedback" role={error ? 'alert' : 'status'}>{error || notice || (scene.length ? 'Выберите объект на холсте или в списке слоёв. Изменения сохраняются в этом браузере.' : 'Начните с выбора объекта в исходной иллюстрации.')}</div>
+        <div className="editor-bottom-actions"><button className="new-scene-button" disabled={!ready} onClick={newScene}>＋ Новая композиция</button>
+          <button className="new-scene-button" disabled={!ready || exampleLoading} onClick={() => setExamplesOpen(true)}>Посмотреть примеры ↗</button></div>
+        {storageProblem && <div className="storage-warning" role="alert"><p>{storageProblem} Можно продолжить работу и скачать SVG. Текущая сцена не сохраняется автоматически.</p>
+          <button onClick={retryStorage}>Сохранить текущую сцену вместо прежней</button></div>}
       </main>
       <aside className="properties-panel">
         <ObjectProperties item={selectedInstance} component={selectedComponent} onChange={changeSelected}
@@ -176,5 +209,7 @@ export default function App() {
       </aside>
     </div>
     {catalogOpen && <SourceCatalogue activeId={sourceId} onChoose={chooseSource} onClose={() => setCatalogOpen(false)} />}
+    {examplesOpen && <ExamplesDialog onChoose={example => { void loadExample(example); }} onClose={() => setExamplesOpen(false)} />}
+    {(!ready || exampleLoading) && <div className="loading-overlay" role="status">{exampleLoading ? 'Собираем пример из исходных SVG…' : 'Восстанавливаем вашу композицию…'}</div>}
   </div>;
 }
