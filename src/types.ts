@@ -4,6 +4,8 @@ export interface SourceIllustration {
   id: string;
   title: string;
   objects: SourceObject[];
+  assetUrl?: string;
+  credit?: string;
 }
 
 export interface LibraryComponent {
@@ -14,6 +16,7 @@ export interface LibraryComponent {
   markup: string;
   width: number;
   height: number;
+  colors?: string[];
 }
 
 export interface SceneObject {
@@ -23,4 +26,5 @@ export interface SceneObject {
   y: number;
   scale: number;
   rotation: number;
+  role?: 'main' | 'background';
 }

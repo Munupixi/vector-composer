@@ -3,8 +3,8 @@ import { catalog } from './catalog';
 import { examples, exampleReferences, exampleScene } from './examples';
 
 describe('demonstration compositions', () => {
-  it('provides three examples, each referencing three different SVG sources', () => {
-    expect(examples).toHaveLength(3);
+  it('provides three new examples and preserves three legacy compositions', () => {
+    expect(examples).toHaveLength(6);
     for (const example of examples) {
       expect(new Set(example.placements.map(p => p.sourceId)).size).toBe(3);
       for (const p of example.placements) expect(catalog.some(s => s.id === p.sourceId && s.objects.some(o => o.id === p.objectId))).toBe(true);

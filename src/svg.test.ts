@@ -10,10 +10,12 @@ import { catalog } from './catalog';
 import { namespaceIds, selectObject } from './svg';
 
 describe('SVG extraction', () => {
-  it('includes exactly 20 unique sources, with three prepared illustrations', () => {
-    expect(catalog).toHaveLength(20);
-    expect(new Set(catalog.map(s => s.id)).size).toBe(20);
-    expect(catalog.filter(s => s.objects.length)).toHaveLength(3);
+  it('preserves the 20 legacy sources alongside all 40 provided variants', () => {
+    const legacy = catalog.filter(s => !s.id.startsWith('figma-'));
+    expect(legacy).toHaveLength(20);
+    expect(new Set(catalog.map(s => s.id)).size).toBe(catalog.length);
+    expect(legacy.filter(s => s.objects.length)).toHaveLength(3);
+    expect(catalog.filter(s => s.id.startsWith('figma-'))).toHaveLength(40);
   });
 
   it('splits the dog accent without changing a single original path command', () => {
@@ -65,6 +67,13 @@ describe('SVG extraction', () => {
   it('rejects malformed input and a missing object', () => {
     expect(() => selectObject('<svg>', 'missing')).toThrow();
     expect(() => selectObject(prepared, 'missing')).toThrow('не найден');
+  });
+
+  it('keeps nested geometry when a complete group is marked as a component', () => {
+    const result = selectObject('<svg xmlns="http://www.w3.org/2000/svg"><g data-component="object" transform="translate(4 5)"><g><path d="M0 0L10 10"/></g></g><path d="M5 5L2 2"/></svg>','object');
+    expect(result.querySelectorAll('path')).toHaveLength(1);
+    expect(result.querySelector('path')?.getAttribute('d')).toBe('M0 0L10 10');
+    expect(result.querySelector('g')?.getAttribute('transform')).toBe('translate(4 5)');
   });
 });
 

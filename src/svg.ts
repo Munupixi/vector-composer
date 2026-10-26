@@ -12,6 +12,7 @@ export function selectObject(source: string, objectId: string): SVGSVGElement {
   if (!selected.length) throw new Error('Этот объект не найден в исходнике.');
   const keep = new Set<Element>();
   for (const node of selected) {
+    node.querySelectorAll('*').forEach(child => keep.add(child));
     let current: Element | null = node;
     while (current && current !== root) { keep.add(current); current = current.parentElement; }
   }
@@ -43,7 +44,7 @@ export function namespaceIds(markup: string, prefix: string): string {
       if (value !== attr.value) node.setAttributeNS(attr.namespaceURI, attr.name, value);
     }
   });
-  return root.innerHTML;
+  return Array.from(root.childNodes).map(node => new XMLSerializer().serializeToString(node)).join('');
 }
 
 /** Browser measurement preserves real bounds after nested SVG transforms. */
@@ -65,7 +66,7 @@ export function extractObject(source: string, objectId: string) {
     if (!box.width || !box.height) throw new Error('У объекта нет видимой геометрии.');
     const padding = 4;
     return {
-      markup: `<g transform="translate(${padding - box.x} ${padding - box.y})">${group.outerHTML}</g>`,
+      markup: `<g transform="translate(${padding - box.x} ${padding - box.y})">${new XMLSerializer().serializeToString(group)}</g>`,
       width: box.width + padding * 2, height: box.height + padding * 2,
     };
   } finally { measuringSvg.remove(); }

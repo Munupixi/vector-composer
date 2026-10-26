@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseSnapshot, snapshotProject } from './storage';
 import type { ProjectSnapshot } from './storage';
+import { palettes } from './palettes';
 
 const saved: ProjectSnapshot = { version: 1, title: 'Пример', sourceId: 'clumsy',
   components: [{ id: 'component-1', sourceId: 'clumsy', objectId: 'character' }],
@@ -26,5 +27,12 @@ describe('project storage', () => {
     expect(() => parseSnapshot('{')).toThrow();
     expect(() => parseSnapshot(JSON.stringify({ ...saved, scene: [{ ...saved.scene[0], scale: 0 }] }))).toThrow();
     expect(() => parseSnapshot(JSON.stringify({ ...saved, scene: [{ ...saved.scene[0], x: '100' }] }))).toThrow();
+  });
+  it('restores formats, detail level, palette and object roles together', () => {
+    const snapshot = { ...saved, settings: { format:'square', detail:'s', palette:palettes[1] },
+      scene: saved.scene.map(o => ({ ...o, role:'background' })) };
+    expect(parseSnapshot(JSON.stringify(snapshot))).toEqual(snapshot);
+    expect(() => parseSnapshot(JSON.stringify({ ...snapshot, settings:{ ...snapshot.settings, format:'unknown' } }))).toThrow();
+    expect(() => parseSnapshot(JSON.stringify({ ...snapshot, settings:{ ...snapshot.settings, palette:{ ...palettes[1],background:'#000000' } } }))).toThrow();
   });
 });

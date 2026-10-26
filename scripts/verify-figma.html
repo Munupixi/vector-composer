@@ -1,0 +1,24 @@
+<!doctype html><meta charset="utf-8"><title>Проверка SVG-конвейера</title><button id="run">Проверить SVG</button><pre id="result"></pre>
+<script type="module">
+import { extractObject } from '../src/svg.ts';
+import { paintComponent } from '../src/paint.ts';
+import { originalPaints, palettes } from '../src/palettes.ts';
+import { catalog,sourceUrl } from '../src/catalog.ts';
+document.querySelector('#run').onclick = async () => {
+ const result=[];
+ for(const source of catalog.filter(s=>s.objects.length)) {
+  const text=await(await fetch(sourceUrl(source))).text();
+  for(const object of source.objects) {
+   let markup='';
+   try {const component=extractObject(text,object.id);markup=component.markup;
+    paintComponent(markup,originalPaints,palettes[0]);
+    result.push({source:source.id,object:object.id,ok:true,width:component.width,height:component.height});
+   } catch(e) {
+    const parsed=new DOMParser().parseFromString(`<svg xmlns="http://www.w3.org/2000/svg">${markup}</svg>`,'image/svg+xml');
+    result.push({source:source.id,object:object.id,ok:false,error:String(e),parse:parsed.querySelector('parsererror')?.textContent,markup:markup.slice(0,1500)});
+   }
+  }
+ }
+ document.querySelector('#result').textContent=JSON.stringify(result);
+};
+</script>

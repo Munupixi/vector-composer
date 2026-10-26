@@ -1,5 +1,6 @@
 import type { LibraryComponent, SceneObject } from '../types';
 import { catalog } from '../catalog';
+import { figmaReference, type ObjectRole } from '../figmaCatalog';
 
 interface Props {
   item: SceneObject | undefined;
@@ -8,15 +9,20 @@ interface Props {
   onScale: (scale: number) => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  onRole: (role: ObjectRole) => void;
 }
 
-export default function ObjectProperties({ item, component, onChange, onScale, onDuplicate, onDelete }: Props) {
+export default function ObjectProperties({ item, component, onChange, onScale, onDuplicate, onDelete, onRole }: Props) {
   const number = (value: number) => Math.round(value * 10) / 10;
   return <section className="properties-section">
     <div className="section-heading"><h2>Свойства объекта</h2><span className="count">↗</span></div>
     {!item || !component ? <p className="properties-empty">Выберите объект на холсте или в списке слоёв, чтобы изменить его.</p> : <>
       <h3 className="property-name">{component.name}</h3>
       <p className="property-source">Из: {catalog.find(s => s.id === component.sourceId)?.title}</p>
+      {figmaReference(component.sourceId) && <label className="role-control">Роль объекта<select aria-label="Роль объекта"
+        value={figmaReference(component.sourceId)!.role} onChange={e => onRole(e.target.value as ObjectRole)}>
+        <option value="main">Главный · цветной</option><option value="background">Фоновый · монохромный</option>
+      </select></label>}
       <div className="coordinate-grid">
         <label>X<input type="number" aria-label="Положение X" step="1" value={number(item.x)} onChange={e => {
           if (Number.isFinite(e.target.valueAsNumber)) onChange({ x: e.target.valueAsNumber });

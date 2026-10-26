@@ -1,6 +1,10 @@
 import { catalog, sourceUrl } from './catalog';
 import { extractObject } from './svg';
 import type { LibraryComponent, SceneObject } from './types';
+import { parseSettings, type CompositionSettings } from './composition';
+import { componentColors } from './paint';
+import { originalPaints } from './palettes';
+import { figmaReference } from './figmaCatalog';
 
 export const STORAGE_KEY = 'sochetaI.project.v1';
 export interface ComponentReference { id: string; sourceId: string; objectId: string; }
@@ -10,11 +14,13 @@ export interface ProjectSnapshot {
   sourceId: string;
   components: ComponentReference[];
   scene: SceneObject[];
+  settings?: CompositionSettings;
 }
 
-export function snapshotProject(title: string, sourceId: string, library: LibraryComponent[], scene: SceneObject[]): ProjectSnapshot {
+export function snapshotProject(title: string, sourceId: string, library: LibraryComponent[], scene: SceneObject[], settings?: CompositionSettings): ProjectSnapshot {
   return { version: 1, title, sourceId,
-    components: library.map(({ id, sourceId, objectId }) => ({ id, sourceId, objectId })), scene };
+    components: library.map(({ id, sourceId, objectId }) => ({ id, sourceId, objectId })), scene,
+    ...(settings ? { settings } : {}) };
 }
 
 function record(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null; }
@@ -44,9 +50,12 @@ export function parseSnapshot(raw: string): ProjectSnapshot {
       || ids.has(item.id) || !finite(item.x) || !finite(item.y) || !finite(item.scale) || !finite(item.rotation)
       || item.scale < 0.05 || item.scale > 3 || item.rotation < -180 || item.rotation > 180) return invalid();
     ids.add(item.id);
-    scene.push({ id: item.id, componentId: item.componentId, x: item.x, y: item.y, scale: item.scale, rotation: item.rotation });
+    if (item.role !== undefined && item.role !== 'main' && item.role !== 'background') return invalid();
+    scene.push({ id: item.id, componentId: item.componentId, x: item.x, y: item.y, scale: item.scale, rotation: item.rotation,
+      ...(item.role ? { role: item.role } : {}) });
   }
-  return { version: 1, title: data.title, sourceId: data.sourceId as string, components, scene };
+  return { version: 1, title: data.title, sourceId: data.sourceId as string, components, scene,
+    ...(data.settings !== undefined ? { settings: parseSettings(data.settings) } : {}) };
 }
 
 export async function hydrateComponents(references: ComponentReference[]): Promise<LibraryComponent[]> {
@@ -61,6 +70,8 @@ export async function hydrateComponents(references: ComponentReference[]): Promi
   return references.map(reference => {
     const object = catalog.find(s => s.id === reference.sourceId)?.objects.find(o => o.id === reference.objectId);
     if (!object) throw new Error('Объект компонента недоступен.');
-    return { ...reference, name: object.name, ...extractObject(sources.get(reference.sourceId)!, reference.objectId) };
+    const extracted = extractObject(sources.get(reference.sourceId)!, reference.objectId);
+    return { ...reference, name: object.name, ...extracted,
+      colors: figmaReference(reference.sourceId) ? originalPaints : componentColors(extracted.markup) };
   });
 }

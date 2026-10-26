@@ -12,8 +12,9 @@ describe('SVG export', () => {
   it('ships three standalone examples made only of prepared source paths', () => {
     const exported = import.meta.glob('../public/examples/*.svg', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
     const prepared = import.meta.glob('../public/assets/prepared/*.svg', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
-    expect(Object.keys(exported)).toHaveLength(3);
-    for (const text of Object.values(exported)) {
+    const figma = import.meta.glob('../public/assets/figma/*.svg', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
+    expect(Object.keys(exported)).toHaveLength(6);
+    for (const [file,text] of Object.entries(exported)) {
       const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
       expect(doc.querySelector('parsererror, image, foreignObject, script, .selection-outline')).toBeNull();
       const groups = Array.from(doc.querySelectorAll('[data-source]'));
@@ -21,7 +22,9 @@ describe('SVG export', () => {
       const ids = Array.from(doc.querySelectorAll('[id]')).map(n => n.id);
       expect(new Set(ids).size).toBe(ids.length);
       for (const group of groups) {
-        const source = prepared[`../public/assets/prepared/${group.getAttribute('data-source')}.svg`];
+        const id = group.getAttribute('data-source')!;
+        const source = id.startsWith('figma-') ? figma[`../public/assets/figma/${id.slice(6)}.svg`] : prepared[`../public/assets/prepared/${id}.svg`];
+        expect(source, file).toBeTruthy();
         const sourceDoc = new DOMParser().parseFromString(source, 'image/svg+xml');
         const paths = new Set(Array.from(sourceDoc.querySelectorAll('path')).map(p => p.getAttribute('d')));
         for (const path of group.querySelectorAll('path')) expect(paths.has(path.getAttribute('d'))).toBe(true);
@@ -50,5 +53,12 @@ describe('SVG export', () => {
   });
   it('does not silently omit a missing component', () => {
     expect(() => exportComposition('Broken', [object], [])).toThrow('Не найден');
+  });
+  it('uses the same source role as the canvas when a saved instance has no role', () => {
+    const background = { ...component, sourceId:'figma-book-l-background', colors:['#FF5678'] };
+    const settings = { format:'landscape' as const, palette:{ name:'Custom', background:'#eeeeee', backgroundColors:['#eeeeee'], objectColors:['#ff0000'] } };
+    const output = exportComposition('Background', [object], [background], settings);
+    const doc = new DOMParser().parseFromString(output,'image/svg+xml');
+    expect(doc.querySelector('[data-source] path')?.getAttribute('fill')).toBe('#eeeeee');
   });
 });

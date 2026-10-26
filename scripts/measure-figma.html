@@ -1,0 +1,15 @@
+<!doctype html><meta charset="utf-8"><title>Измерение исходных SVG</title>
+<button id="measure">Измерить компоненты</button><pre id="result"></pre><div id="svg"></div>
+<script type="module">
+document.querySelector('#measure').onclick = async () => {
+ const bounds = {};
+ for (const key of ['book','phone','puzzle','coin','headphones','lamp','folder','pen','wallet','flowers'])
+ for (const size of ['s','l']) for (const role of ['main','background']) {
+   const id = `${key}-${size}-${role}`;
+   document.querySelector('#svg').innerHTML = await (await fetch(`/assets/figma/${id}.svg`)).text();
+   const node = document.querySelector('#svg [data-component]'); const b = node.getBBox();
+   bounds[id] = [b.x,b.y,b.width,b.height];
+ }
+ document.querySelector('#result').textContent = JSON.stringify(bounds);
+};
+</script>

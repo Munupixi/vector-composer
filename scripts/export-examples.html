@@ -1,0 +1,18 @@
+<!doctype html><meta charset="utf-8"><title>Экспорт проверочных композиций</title><button id="run">Подготовить примеры</button><pre id="result"></pre><div id="previews"></div>
+<script type="module">
+import { examples,exampleReferences,exampleScene } from '../src/examples.ts';
+import { hydrateComponents } from '../src/storage.ts';
+import { exportComposition } from '../src/export.ts';
+document.querySelector('#run').onclick = async () => {
+ const output=[];
+ for(const example of examples.filter(e=>e.settings)) {
+  const library=await hydrateComponents(exampleReferences(example,[]));
+  const scene=exampleScene(example,library);
+  const svg=exportComposition(example.title,scene,library,example.settings);
+  output.push({id:example.id,svg});
+  const preview=document.createElement('div');preview.style.cssText='display:inline-block;vertical-align:top;width:30%;margin:1%';preview.innerHTML=svg;
+  preview.querySelector('svg').style.cssText='width:100%;height:auto';document.querySelector('#previews').append(preview);
+ }
+ document.querySelector('#result').textContent=JSON.stringify(output);
+};
+</script>

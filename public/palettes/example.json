@@ -1,0 +1,6 @@
+{
+  "name": "Моя палитра",
+  "background": "#e5edf7",
+  "backgroundColors": ["#e5edf7", "#a8bfdc", "#55799f"],
+  "objectColors": ["#e5edf7", "#a8bfdc", "#55799f", "#f8d970", "#ee9a91", "#fbe4df", "#20252b", "#ffffff"]
+}

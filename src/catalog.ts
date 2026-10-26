@@ -1,6 +1,11 @@
 import type { SourceIllustration } from './types';
+import { figmaObjects, figmaSourceId } from './figmaCatalog';
 
 export const catalog: SourceIllustration[] = [
+  ...figmaObjects.flatMap(object => (['s', 'l'] as const).flatMap(size => (['main', 'background'] as const).map(role => ({
+    id: figmaSourceId(object.id, size, role), title: `${object.name} · ${size.toUpperCase()} · ${role === 'main' ? 'Главный' : 'Фоновый'}`,
+    objects: [{ id: 'object', name: object.name }], assetUrl: `/assets/figma/${object.id}-${size}-${role}.svg`, credit: 'Библиотека из задания · Figma',
+  })))),
   { id: 'clumsy', title: 'Бумажный вихрь', objects: [
     { id: 'character', name: 'Персонаж' }, { id: 'papers-left', name: 'Листы слева' }, { id: 'papers-right', name: 'Листы справа' },
   ] },
@@ -21,5 +26,5 @@ export const catalog: SourceIllustration[] = [
 ];
 
 export function sourceUrl(source: SourceIllustration) {
-  return `/assets/${source.objects.length ? 'prepared' : 'originals'}/${source.id}.svg`;
+  return source.assetUrl ?? `/assets/${source.objects.length ? 'prepared' : 'originals'}/${source.id}.svg`;
 }
