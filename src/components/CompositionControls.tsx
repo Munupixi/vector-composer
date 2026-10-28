@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { formats, parsePalette, type CompositionSettings, type Format } from '../composition';
 import { palettes } from '../palettes';
+import { publicUrl } from '../publicUrl';
 
 interface Props { busy: boolean; settings: CompositionSettings; onChange: (s: CompositionSettings) => void; }
 export default function CompositionControls({ busy, settings, onChange }: Props) {
@@ -37,7 +38,7 @@ export default function CompositionControls({ busy, settings, onChange }: Props)
       <button onClick={() => onChange({ ...settings, palette: null })}>Исходные цвета</button>
     </>}
     <details><summary>Формат файла палитры</summary><p>Цвета фона задаются отдельно от цветов объектов. Все цвета — в формате #RRGGBB.</p>
-      <p><a href="/palettes/example.json" download>Скачать пример палитры</a></p>
+      <p><a href={publicUrl('palettes/example.json')} download>Скачать пример палитры</a></p>
       <pre>{JSON.stringify({ name: 'Моя палитра', background: '#eee8ff', backgroundColors: ['#eee8ff', '#c8b6f0'],
         objectColors: ['#eee8ff', '#c8b6f0', '#7864d7', '#f8d970', '#f9a3aa', '#ffe3e1', '#181817', '#ffffff'] }, null, 2)}</pre>
       <p>Порядок цветов объектов: светлый, средний и тёмный фоновые оттенки, три акцента, контур и белый. Можно задать свою палитру той же структуры.</p>

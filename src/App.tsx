@@ -22,6 +22,7 @@ import AutoComposer from './components/AutoComposer';
 import { generationReferences, layoutComponents, selectComponents } from './generation';
 import type { ComponentReference } from './storage';
 import Confirmation from './components/Confirmation';
+import { publicUrl } from './publicUrl';
 
 function ComponentPreview({ component }: { component: LibraryComponent }) {
   return <svg viewBox={`0 0 ${component.width} ${component.height}`} aria-hidden="true">
@@ -246,7 +247,7 @@ export default function App() {
 
   return <div className="app-shell" onKeyDown={handleKeys}>
     <header className="topbar">
-      <a className="brand" href="/" aria-label="Сочетай — на главную"><span className="brand-mark" aria-hidden="true"><i /><i /><i /></span>сочетай<span className="brand-dot">.</span></a>
+      <a className="brand" href={publicUrl('')} aria-label="Сочетай — на главную"><span className="brand-mark" aria-hidden="true"><i /><i /><i /></span>сочетай<span className="brand-dot">.</span></a>
       <span className="topbar-caption">Конструктор векторных композиций</span>
       <span className="local-badge"><span /> {storageProblem ? 'Автосохранение недоступно' : saving ? 'Сохраняем…' : 'Сохранено в браузере'}</span>
       <button className="export-button" disabled={!ready || exampleLoading || !scene.length} onClick={exportScene}>Скачать SVG <span>↓</span></button>

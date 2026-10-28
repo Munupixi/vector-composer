@@ -1,5 +1,6 @@
 import type { SourceIllustration } from './types';
 import { figmaObjects, figmaSourceId } from './figmaCatalog';
+import { publicUrl } from './publicUrl';
 
 export const catalog: SourceIllustration[] = [
   ...figmaObjects.flatMap(object => (['s', 'l'] as const).flatMap(size => (['main', 'background'] as const).map(role => ({
@@ -26,5 +27,5 @@ export const catalog: SourceIllustration[] = [
 ];
 
 export function sourceUrl(source: SourceIllustration) {
-  return source.assetUrl ?? `/assets/${source.objects.length ? 'prepared' : 'originals'}/${source.id}.svg`;
+  return publicUrl(source.assetUrl ?? `/assets/${source.objects.length ? 'prepared' : 'originals'}/${source.id}.svg`);
 }
